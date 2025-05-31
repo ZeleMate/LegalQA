@@ -192,3 +192,53 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Feldolgozott adatok
+processed_data/
+processed_data/*.parquet
+processed_data/*.bin
+processed_data/*.pkl
+processed_data/graph_data/
+processed_data/graph_data/*.gpickle
+processed_data/graph_data/*.csv
+processed_data/graph_data/*.json
+
+# Dokumentum mappák
+documents/
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Környezeti változók
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
