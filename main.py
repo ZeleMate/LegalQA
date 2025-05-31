@@ -58,10 +58,6 @@ class CustomRetriever(BaseRetriever, BaseModel):
                 matching_docs = self.documents_df[self.documents_df['doc_id'] == doc_id]
                 if not matching_docs.empty:
                     doc = matching_docs.iloc[0]
-                    # Szöveg rövidítése (max 1500 karakter)
-                    text = doc['text']
-                    if len(text) > 1500:
-                        text = text[:1500] + "..."
                     
                     # Metaadatok összeállítása
                     metadata = {
@@ -73,7 +69,7 @@ class CustomRetriever(BaseRetriever, BaseModel):
                         'relevancia': float(1 / (1 + distance))  # Relevancia pontszám
                     }
                     documents.append(Document(
-                        page_content=text,
+                        page_content=f"Dokumentum azonosító: {doc_id}",  # Csak az azonosítót adjuk vissza
                         metadata=metadata
                     ))
                     seen_doc_ids.add(doc_id)
@@ -90,9 +86,6 @@ class CustomRetriever(BaseRetriever, BaseModel):
                                 neighbor_doc = self.documents_df[self.documents_df['doc_id'] == neighbor]
                                 if not neighbor_doc.empty:
                                     neighbor_row = neighbor_doc.iloc[0]
-                                    text = neighbor_row['text']
-                                    if len(text) > 1500:
-                                        text = text[:1500] + "..."
                                     
                                     neighbor_metadata = {
                                         'MeghozoBirosag': neighbor_row['MeghozoBirosag'],
@@ -103,7 +96,7 @@ class CustomRetriever(BaseRetriever, BaseModel):
                                         'relevancia': 0.7  # Alacsonyabb relevancia a szomszédoknak
                                     }
                                     documents.append(Document(
-                                        page_content=text,
+                                        page_content=f"Dokumentum azonosító: {neighbor}",  # Csak az azonosítót adjuk vissza
                                         metadata=neighbor_metadata
                                     ))
                                     seen_doc_ids.add(neighbor)
@@ -179,12 +172,14 @@ class LegalQASystem:
         template = """Te egy jogi asszisztens vagy, aki a megadott jogi dokumentumok alapján válaszol a kérdésekre.
         
         Fontos szabályok:
-        1. CSAK a megadott kontextusban található információkat használd fel a válaszadáshoz
-        2. Ha a válasz nem található a kontextusban, azt egyértelműen jelezd: "A megadott dokumentumokban nem található releváns információ ehhez a kérdéshez."
-        3. Mindig hivatkozz a konkrét jogszabályokra és precedensekre, amelyeket a kontextusban találsz
-        4. A válaszodban használj konkrét példákat és eseteket a kontextusból
-        5. Ha több releváns dokumentum is van, mindegyikre hivatkozz
-        6. A válaszod legyen strukturált és jól követhető
+        1. CSAK a megadott kontextusban található dokumentumok azonosítóit listázd fel
+        2. Minden dokumentum esetén add meg a következő információkat:
+           - Dokumentum azonosító (doc_id)
+           - Meghozó bíróság
+           - Jogtérület
+           - Határozat éve
+        3. Ha nincs releváns dokumentum, azt jelezd: "Nem található releváns dokumentum ehhez a kérdéshez."
+        4. A dokumentumokat relevancia szerint rendezd (csökkenő sorrendben)
         
         Kontextus: {context}
         
@@ -214,13 +209,15 @@ class LegalQASystem:
 def main():
     # Rendszer inicializálása
     qa_system = LegalQASystem()
-    qa_system.load_documents()
+    if not qa_system.load_documents():
+        print("Hiba történt a dokumentumok betöltése során!")
+        return
     
     # Teszt kérdés
-    question = "Mi a jogi következménye annak, ha valaki nem fizeti be a járulékokat?"
+    question = "Milyen jogi következményei vannak annak, ha egy munkavállaló nem teljesíti a munkaköri feladatait?"
+    print(f"\nKérdés: {question}")
     answer = qa_system.ask_question(question)
-    print(f"Kérdés: {question}")
-    print(f"Válasz: {answer}")
+    print(f"\nVálasz: {answer}")
 
 if __name__ == "__main__":
     main()
