@@ -42,21 +42,26 @@ class CustomRetriever(BaseRetriever, BaseModel):
         # FAISS keresés - numpy array konvertálás
         query_embedding = np.array([query_embedding]).astype('float32')
         
-        # FAISS keresés - csak 3 legrelevánsabb dokumentum
-        D, I = self.faiss_index.search(query_embedding, 3)
+        # FAISS keresés - több releváns dokumentum (5 helyett 8)
+        D, I = self.faiss_index.search(query_embedding, 8)
         
-        # Dokumentumok lekérése
+        # Dokumentumok lekérése és relevancia alapján rendezése
         documents = []
-        for idx in I[0]:
+        seen_doc_ids = set()  # Duplikált dokumentumok elkerülése
+        
+        for idx, distance in zip(I[0], D[0]):
             if idx in self.id_mapping:
                 doc_id = self.id_mapping[idx]
+                if doc_id in seen_doc_ids:
+                    continue
+                    
                 matching_docs = self.documents_df[self.documents_df['doc_id'] == doc_id]
                 if not matching_docs.empty:
                     doc = matching_docs.iloc[0]
-                    # Szöveg rövidítése (max 1000 karakter)
+                    # Szöveg rövidítése (max 1500 karakter)
                     text = doc['text']
-                    if len(text) > 1000:
-                        text = text[:1000] + "..."
+                    if len(text) > 1500:
+                        text = text[:1500] + "..."
                     
                     # Metaadatok összeállítása
                     metadata = {
@@ -64,41 +69,47 @@ class CustomRetriever(BaseRetriever, BaseModel):
                         'JogTerulet': doc['JogTerulet'],
                         'Jogszabalyhelyek': doc['Jogszabalyhelyek'],
                         'HatarozatEve': doc['HatarozatEve'],
-                        'doc_id': doc_id
+                        'doc_id': doc_id,
+                        'relevancia': float(1 / (1 + distance))  # Relevancia pontszám
                     }
                     documents.append(Document(
                         page_content=text,
                         metadata=metadata
                     ))
+                    seen_doc_ids.add(doc_id)
         
-        # Gráf alapú relevancia növelése - csak 2 szomszéd
+        # Gráf alapú relevancia növelése - több szomszéd
         if self.graph and len(documents) > 0:
             for doc in documents:
                 if hasattr(doc, 'metadata') and doc.metadata and isinstance(doc.metadata, dict) and 'doc_id' in doc.metadata:
                     doc_id = doc.metadata['doc_id']
                     if doc_id in self.graph:
-                        neighbors = list(self.graph.neighbors(doc_id))[:2]  # Csak 2 szomszéd
+                        neighbors = list(self.graph.neighbors(doc_id))[:3]  # 3 szomszéd
                         for neighbor in neighbors:
-                            if len(documents) < 5:  # Maximum 5 dokumentum összesen
+                            if neighbor not in seen_doc_ids and len(documents) < 12:  # Maximum 12 dokumentum összesen
                                 neighbor_doc = self.documents_df[self.documents_df['doc_id'] == neighbor]
                                 if not neighbor_doc.empty:
                                     neighbor_row = neighbor_doc.iloc[0]
-                                    # Szöveg rövidítése
                                     text = neighbor_row['text']
-                                    if len(text) > 1000:
-                                        text = text[:1000] + "..."
+                                    if len(text) > 1500:
+                                        text = text[:1500] + "..."
                                     
                                     neighbor_metadata = {
                                         'MeghozoBirosag': neighbor_row['MeghozoBirosag'],
                                         'JogTerulet': neighbor_row['JogTerulet'],
                                         'Jogszabalyhelyek': neighbor_row['Jogszabalyhelyek'],
                                         'HatarozatEve': neighbor_row['HatarozatEve'],
-                                        'doc_id': neighbor
+                                        'doc_id': neighbor,
+                                        'relevancia': 0.7  # Alacsonyabb relevancia a szomszédoknak
                                     }
                                     documents.append(Document(
                                         page_content=text,
                                         metadata=neighbor_metadata
                                     ))
+                                    seen_doc_ids.add(neighbor)
+        
+        # Relevancia szerint rendezés
+        documents.sort(key=lambda x: x.metadata.get('relevancia', 0), reverse=True)
         
         return documents
 
@@ -165,9 +176,15 @@ class LegalQASystem:
         """Egyedi prompt a jogi kérdésekhez"""
         from langchain.prompts import PromptTemplate
         
-        template = """A következő kérdésre válaszolj a megadott kontextus alapján. 
-        Ha a válasz nem található a kontextusban, azt jelezd, de próbálj meg hasznos információt adni.
-        A válaszodban hivatkozz a releváns jogszabályokra és precedensekre.
+        template = """Te egy jogi asszisztens vagy, aki a megadott jogi dokumentumok alapján válaszol a kérdésekre.
+        
+        Fontos szabályok:
+        1. CSAK a megadott kontextusban található információkat használd fel a válaszadáshoz
+        2. Ha a válasz nem található a kontextusban, azt egyértelműen jelezd: "A megadott dokumentumokban nem található releváns információ ehhez a kérdéshez."
+        3. Mindig hivatkozz a konkrét jogszabályokra és precedensekre, amelyeket a kontextusban találsz
+        4. A válaszodban használj konkrét példákat és eseteket a kontextusból
+        5. Ha több releváns dokumentum is van, mindegyikre hivatkozz
+        6. A válaszod legyen strukturált és jól követhető
         
         Kontextus: {context}
         
