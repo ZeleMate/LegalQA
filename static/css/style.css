@@ -138,4 +138,49 @@ h1::after {
     font-weight: 500;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
+}
+
+.rating {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.rating i {
+    font-size: 1.5rem;
+    color: #e4e5e9;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.rating i:hover {
+    transform: scale(1.1);
+}
+
+#feedbackForm {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 4px solid var(--accent-color);
+}
+
+#feedbackForm h6 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+#feedbackComments {
+    resize: vertical;
+    min-height: 80px;
+}
+
+#submitFeedback {
+    background-color: var(--accent-color);
+    border: none;
+    transition: all 0.3s ease;
+}
+
+#submitFeedback:hover {
+    background-color: #c0392b;
+    transform: translateY(-2px);
 } 
