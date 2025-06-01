@@ -29,6 +29,8 @@ class InMemoryHistory(BaseChatMessageHistory):
         self.messages = []
 
 class CustomRetriever(BaseRetriever, BaseModel):
+    """Egyedi dokumentum kereső a jogi dokumentumokhoz"""
+    
     embeddings: OpenAIEmbeddings = Field(..., description="OpenAI embeddings model")
     faiss_index: faiss.Index = Field(..., description="FAISS index")
     id_mapping: dict = Field(..., description="ID mapping dictionary")
@@ -36,18 +38,22 @@ class CustomRetriever(BaseRetriever, BaseModel):
     graph: nx.Graph = Field(..., description="Graph data")
 
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> list[Document]:
-        # Kérdezés beágyazása
+        """
+        Releváns dokumentumok keresése a kérdés alapján
+        
+        Args:
+            query: A keresési kérdés
+            run_manager: Opcionális futáskezelő
+            
+        Returns:
+            Lista a releváns dokumentumokról
+        """
         query_embedding = self.embeddings.embed_query(query)
-        
-        # FAISS keresés - numpy array konvertálás
         query_embedding = np.array([query_embedding]).astype('float32')
-        
-        # FAISS keresés - több releváns dokumentum (5 helyett 8)
         D, I = self.faiss_index.search(query_embedding, 8)
         
-        # Dokumentumok lekérése és relevancia alapján rendezése
         documents = []
-        seen_doc_ids = set()  # Duplikált dokumentumok elkerülése
+        seen_doc_ids = set()
         
         for idx, distance in zip(I[0], D[0]):
             if idx in self.id_mapping:
@@ -58,56 +64,53 @@ class CustomRetriever(BaseRetriever, BaseModel):
                 matching_docs = self.documents_df[self.documents_df['doc_id'] == doc_id]
                 if not matching_docs.empty:
                     doc = matching_docs.iloc[0]
-                    
-                    # Metaadatok összeállítása
                     metadata = {
                         'MeghozoBirosag': doc['MeghozoBirosag'],
                         'JogTerulet': doc['JogTerulet'],
                         'Jogszabalyhelyek': doc['Jogszabalyhelyek'],
                         'HatarozatEve': doc['HatarozatEve'],
                         'doc_id': doc_id,
-                        'relevancia': float(1 / (1 + distance))  # Relevancia pontszám
+                        'relevancia': float(1 / (1 + distance))
                     }
                     documents.append(Document(
-                        page_content=f"Dokumentum azonosító: {doc_id}",  # Csak az azonosítót adjuk vissza
+                        page_content=f"Dokumentum azonosító: {doc_id}",
                         metadata=metadata
                     ))
                     seen_doc_ids.add(doc_id)
         
-        # Gráf alapú relevancia növelése - több szomszéd
         if self.graph and len(documents) > 0:
             for doc in documents:
                 if hasattr(doc, 'metadata') and doc.metadata and isinstance(doc.metadata, dict) and 'doc_id' in doc.metadata:
                     doc_id = doc.metadata['doc_id']
                     if doc_id in self.graph:
-                        neighbors = list(self.graph.neighbors(doc_id))[:3]  # 3 szomszéd
+                        neighbors = list(self.graph.neighbors(doc_id))[:3]
                         for neighbor in neighbors:
-                            if neighbor not in seen_doc_ids and len(documents) < 12:  # Maximum 12 dokumentum összesen
+                            if neighbor not in seen_doc_ids and len(documents) < 12:
                                 neighbor_doc = self.documents_df[self.documents_df['doc_id'] == neighbor]
                                 if not neighbor_doc.empty:
                                     neighbor_row = neighbor_doc.iloc[0]
-                                    
                                     neighbor_metadata = {
                                         'MeghozoBirosag': neighbor_row['MeghozoBirosag'],
                                         'JogTerulet': neighbor_row['JogTerulet'],
                                         'Jogszabalyhelyek': neighbor_row['Jogszabalyhelyek'],
                                         'HatarozatEve': neighbor_row['HatarozatEve'],
                                         'doc_id': neighbor,
-                                        'relevancia': 0.7  # Alacsonyabb relevancia a szomszédoknak
+                                        'relevancia': 0.7
                                     }
                                     documents.append(Document(
-                                        page_content=f"Dokumentum azonosító: {neighbor}",  # Csak az azonosítót adjuk vissza
+                                        page_content=f"Dokumentum azonosító: {neighbor}",
                                         metadata=neighbor_metadata
                                     ))
                                     seen_doc_ids.add(neighbor)
         
-        # Relevancia szerint rendezés
         documents.sort(key=lambda x: x.metadata.get('relevancia', 0), reverse=True)
-        
         return documents
 
 class LegalQASystem:
+    """Jogi kérdés-válasz rendszer"""
+    
     def __init__(self):
+        """Rendszer inicializálása"""
         self.embeddings = OpenAIEmbeddings()
         self.vector_store = None
         self.qa_chain = None
@@ -117,29 +120,21 @@ class LegalQASystem:
         self.id_mapping = None
         self.graph = None
 
-    def load_documents(self):
-        """Feldolgozott dokumentumok és indexek betöltése"""
+    def load_documents(self) -> bool:
+        """
+        Feldolgozott dokumentumok és indexek betöltése
+        
+        Returns:
+            bool: Sikeres betöltés esetén True, egyébként False
+        """
         try:
-            # Parquet fájl betöltése
             self.documents_df = pd.read_parquet('processed_data/processed_documents_with_embeddings.parquet')
-            
-            # DEBUG: oszlopnevek kiírása
-            print("Oszlopnevek a DataFrame-ben:", self.documents_df.columns.tolist())
-            # DEBUG: első 3 sor kiírása
-            print("Első 3 sor az adathalmazból:")
-            print(self.documents_df.head(3))
-            print("Első sor típusa:", type(self.documents_df.iloc[0]))
-            
-            # FAISS index betöltése
             self.faiss_index = faiss.read_index('processed_data/faiss_index.bin')
             
-            # ID leképezések betöltése
             with open('processed_data/faiss_id_mapping.pkl', 'rb') as f:
                 self.id_mapping = pickle.load(f)
             
-            # Gráf betöltése
             self.graph = nx.read_graphml('processed_data/graph_data/graph.graphml')
-            
             self._initialize_qa_chain()
             return True
         except Exception as e:
@@ -147,7 +142,7 @@ class LegalQASystem:
             return False
 
     def _initialize_qa_chain(self):
-        """QA lánc inicializálása"""
+        """QA lánc inicializálása a dokumentumok betöltése után"""
         llm = ChatOpenAI(temperature=0)
         
         retriever = CustomRetriever(
@@ -166,7 +161,12 @@ class LegalQASystem:
         )
 
     def _get_qa_prompt(self):
-        """Egyedi prompt a jogi kérdésekhez"""
+        """
+        Egyedi prompt generálása a jogi kérdésekhez
+        
+        Returns:
+            PromptTemplate: A generált prompt sablon
+        """
         from langchain.prompts import PromptTemplate
         
         template = """Te egy jogi asszisztens vagy, aki a megadott jogi dokumentumok alapján válaszol a kérdésekre.
@@ -182,9 +182,7 @@ class LegalQASystem:
         4. A dokumentumokat relevancia szerint rendezd (csökkenő sorrendben)
         
         Kontextus: {context}
-        
         Kérdés: {question}
-        
         Válasz:"""
         
         return PromptTemplate(
@@ -192,8 +190,19 @@ class LegalQASystem:
             template=template
         )
 
-    def ask_question(self, question):
-        """Kérdés megválaszolása"""
+    def ask_question(self, question: str) -> str:
+        """
+        Kérdés megválaszolása a rendszer által
+        
+        Args:
+            question: A felhasználó kérdése
+            
+        Returns:
+            str: A rendszer válasza
+            
+        Raises:
+            ValueError: Ha a rendszer nincs inicializálva
+        """
         if not self.qa_chain:
             raise ValueError("A QA rendszer nincs inicializálva! Először töltsd be a dokumentumokat.")
         
@@ -206,18 +215,13 @@ class LegalQASystem:
         except Exception as e:
             return f"Hiba történt a kérdés megválaszolása során: {str(e)}"
 
-def main():
-    # Rendszer inicializálása
+if __name__ == "__main__":
     qa_system = LegalQASystem()
     if not qa_system.load_documents():
         print("Hiba történt a dokumentumok betöltése során!")
-        return
+        exit(1)
     
-    # Teszt kérdés
     question = "Milyen jogi következményei vannak annak, ha egy munkavállaló nem teljesíti a munkaköri feladatait?"
     print(f"\nKérdés: {question}")
     answer = qa_system.ask_question(question)
     print(f"\nVálasz: {answer}")
-
-if __name__ == "__main__":
-    main()
