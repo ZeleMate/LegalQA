@@ -1,7 +1,8 @@
+import os
+import uuid
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from main import LegalQASystem
-import pandas as pd
+from src.qa_system import LegalQASystem
 
 app = Flask(__name__)
 CORS(app)  # CORS engedélyezése minden route-hoz
@@ -48,7 +49,7 @@ def ask():
         return jsonify({
             'status': 'success',
             'answer': answer,
-            'feedback_id': str(pd.Timestamp.now())  # Egyedi azonosító a visszajelzéshez
+            'feedback_id': str(uuid.uuid4())  # Egyedi, biztonságos azonosító a visszajelzéshez
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
@@ -149,4 +150,6 @@ def quality_analysis():
         return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001) 
+    # A debug mód beállítása környezeti változóból a biztonság érdekében
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    app.run(debug=debug_mode, host='0.0.0.0', port=5001) 
