@@ -1,211 +1,81 @@
-# LegalQA
+# LegalQA: Intelligens Jogi Kérdés-Válasz Rendszer
 
-Jogi kérdés-válasz rendszer RAG (Retrieval-Augmented Generation) alapú megoldással.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Leírás
+A **LegalQA** egy fejlett, RAG (Retrieval-Augmented Generation) architektúrán alapuló rendszer, amely képes nagyméretű jogi dokumentum-adatbázisok tartalmát megérteni és azokkal kapcsolatban feltett kérdésekre kontextuális, pontos válaszokat adni.
 
-A LegalQA egy olyan rendszer, amely jogi dokumentumok feldolgozására és kérdések megválaszolására szolgál. A rendszer a következő fő funkciókat tartalmazza:
+## Főbb Funkciók
 
-- Dokumentumok betöltése és feldolgozása
-- Kérdések megválaszolása a betöltött dokumentumok alapján
-- Webes felület a könnyű használathoz
-- Felhasználói visszajelzések kezelése és elemzése
-- Automatikus tanulás a visszajelzések alapján
-- Válaszok minőségének biztosítása és validálása
-- Dokumentumok gyorsítótárazása
-- Időbeli trendek és kérdési mintázatok elemzése
-- Válaszok minőségének automatikus javítása
+- **Dinamikus Dokumentumfeldolgozás:** A rendszer képes betölteni és feldolgozni előkészített jogi dokumentumokat.
+- **Intelligens Kérdés-Válasz:** A LangChain és OpenAI modellek segítségével kontextus-érzékeny válaszokat generál.
+- **Moduláris Architektúra:** A projekt logikája tiszta, karbantartható és bővíthető modulokba van szervezve.
+- **Webes Felület:** Egy egyszerű, Flask alapú webes interfész a rendszerrel való interakcióhoz.
+- **Visszajelzés és Elemzés:** Lehetőséget biztosít a felhasználói visszajelzések gyűjtésére és azok későbbi elemzésére.
+- **Biztonságos Működés:** A kritikus műveletek, mint a titkos kulcsok kezelése és a parancsfuttatás, biztonsági szempontok figyelembevételével lettek kialakítva.
 
-## Rendszerarchitektúra
+## Architektúra és Technológiai Háttér
 
-### Fő komponensek
+A rendszer egy modern, Python alapú technológiai készletre épül, amelynek központi elemei a következők:
 
-1. **LegalQASystem**: A rendszer fő osztálya, amely koordinálja az összes komponenst
-2. **CustomRetriever**: Egyedi dokumentum kereső a jogi dokumentumokhoz
-3. **QualityAssurance**: Válaszok minőségének biztosítása és validálása
-4. **UserFeedback**: Felhasználói visszajelzések kezelése
-5. **FeedbackAnalyzer**: Részletes visszajelzés-elemző
-6. **AutoLearner**: Automatikus tanulás a visszajelzések alapján
-7. **DocumentCache**: Dokumentumok gyorsítótárazása
+- **Backend:** Flask
+- **AI/LLM:** LangChain, OpenAI
+- **Adatfeldolgozás és Keresés:** Pandas, FAISS (Facebook AI Similarity Search)
+- **Kódstruktúra:** A projekt logikája a `src/` könyvtárban található, moduláris felépítésben:
+  - `data_processing.py`: Adatok betöltése és gyorsítótárazása (`DocumentCache`).
+  - `retrieval.py`: Releváns dokumentumok visszakeresése (`CustomRetriever`).
+  - `feedback.py`: Felhasználói visszajelzések kezelése (`UserFeedback`, `FeedbackAnalyzer`).
+  - `learning.py`: Minőségbiztosítási és tanulási funkciók (`QualityAssurance`, `AutoLearner`).
+  - `qa_system.py`: A rendszer központi vezérlő logikája (`LegalQASystem`).
 
-### Adatbázis
+## Telepítés és Beüzemelés
 
-A rendszer SQLite adatbázist használ a visszajelzések tárolására:
+Az alábbi lépésekkel telepítheted és futtathatod a projektet a saját gépeden.
 
-```sql
-CREATE TABLE feedback (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    feedback_id TEXT NOT NULL,
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    rating INTEGER NOT NULL,
-    comments TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## Telepítés
-
-1. Klónozd le a repository-t:
+### 1. Kódtár klónozása
 ```bash
-git clone [repository-url]
+git clone https://github.com/a-te-felhasznaloneved/LegalQA.git
 cd LegalQA
 ```
 
-2. Telepítsd a szükséges függőségeket:
+### 2. Virtuális Környezet és Függőségek
+Ajánlott egy virtuális környezetet létrehozni a projekt számára.
+```bash
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# vagy
+venv\Scripts\activate  # Windows
+```
+Telepítsd a szükséges csomagokat:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Használat
+### 3. Környezeti Változók
+A rendszernek szüksége van egy OpenAI API kulcsra a működéshez. Hozz létre egy `.env` fájlt a projekt gyökérkönyvtárában, és add hozzá a kulcsodat:
+```
+OPENAI_API_KEY="a-te-openai-api-kulcsod"
+```
+**Fontos:** A `.gitignore` fájl be van állítva úgy, hogy ezt a fájlt ne töltse fel a kódtárba.
 
-1. Indítsd el a szervert:
+### 4. Adatok előkészítése
+A rendszer a `processed_data/` könyvtárban keresi a feldolgozott adatokat. Mivel ezek a nagyméretű fájlok nem részei a kódtárnak, neked kell biztosítanod őket. A betöltő logika a következő fájlokat várja:
+- `processed_data/processed_documents_with_embeddings.parquet`
+- `processed_data/faiss_id_mapping.pkl`
+- `processed_data/faiss_index.bin`
+- `processed_data/graph_data/document_graph.gpickle` (opcionális)
+
+### 5. Alkalmazás indítása
+Indítsd el a Flask webalkalmazást:
 ```bash
 python app.py
 ```
+Az alkalmazás alapértelmezetten a `http://127.0.0.1:5001` címen lesz elérhető.
 
-2. Nyisd meg a böngészőben: `http://localhost:5001`
+## Használat
+1.  **Nyisd meg a webes felületet:** Navigálj a böngésződben a `http://127.0.0.1:5001` címre.
+2.  **Dokumentumok betöltése:** Az első lépés a "Dokumentumok betöltése" gombra kattintani. Ez inicializálja a rendszert a `processed_data` könyvtárban található adatokkal.
+3.  **Kérdés feltevése:** Írd be a kérdésedet a szövegmezőbe, majd kattints a "Kérdés feltétele" gombra.
+4.  **Visszajelzés:** A válasz megjelenése után lehetőséged van értékelni azt és szöveges megjegyzést fűzni hozzá.
 
-3. A webes felületen keresztül:
-   - Először töltsd be a dokumentumokat a "Dokumentumok betöltése" gombbal
-   - Ezután tehetsz fel kérdéseket a rendszernek
-   - Értékeld a válaszokat és adj visszajelzést
-
-## API Dokumentáció
-
-### Alap URL
-```
-http://localhost:5001
-```
-
-### Endpoints
-
-#### 1. Dokumentumok betöltése
-- **URL**: `/load_documents`
-- **Metódus**: `POST`
-- **Leírás**: Betölti és feldolgozza a jogi dokumentumokat
-- **Válasz**: 
-  ```json
-  {
-    "status": "success",
-    "message": "Dokumentumok sikeresen betöltve!"
-  }
-  ```
-- **Hibakezelés**:
-  ```json
-  {
-    "status": "error",
-    "message": "Hiba történt a dokumentumok betöltése során!"
-  }
-  ```
-
-#### 2. Kérdés megválaszolása
-- **URL**: `/ask`
-- **Metódus**: `POST`
-- **Leírás**: Megválaszol egy jogi kérdést a betöltött dokumentumok alapján
-- **Kérés body**:
-  ```json
-  {
-    "question": "A kérdés szövege"
-  }
-  ```
-- **Válasz**:
-  ```json
-  {
-    "status": "success",
-    "answer": "A válasz szövege",
-    "feedback_id": "egyedi_azonosító"
-  }
-  ```
-- **Hibakezelés**:
-  ```json
-  {
-    "status": "error",
-    "message": "Hiba történt a kérdés megválaszolása során!"
-  }
-  ```
-
-#### 3. Visszajelzés küldése
-- **URL**: `/feedback`
-- **Metódus**: `POST`
-- **Leírás**: Felhasználói visszajelzés mentése
-- **Kérés body**:
-  ```json
-  {
-    "feedback_id": "egyedi_azonosító",
-    "rating": 5,
-    "comments": "Opcionális megjegyzések"
-  }
-  ```
-- **Válasz**:
-  ```json
-  {
-    "status": "success",
-    "message": "Visszajelzés sikeresen mentve!"
-  }
-  ```
-- **Hibakezelés**:
-  ```json
-  {
-    "status": "error",
-    "message": "Hiányzó visszajelzési adatok!"
-  }
-  ```
-
-#### 4. Visszajelzések elemzése
-- **URL**: `/feedback/analysis`
-- **Metódus**: `GET`
-- **Leírás**: Visszajelzések elemzésének lekérdezése
-- **Válasz**:
-  ```json
-  {
-    "status": "success",
-    "analysis": {
-      "temporal_trends": {
-        "trend_irány": "javuló/romló/stabil",
-        "átlagos_értékelés_változás": 0.5,
-        "visszajelzések_száma_változás": 10,
-        "jelentős_változások": ["változás1", "változás2"],
-        "javaslatok": ["javaslat1", "javaslat2"]
-      },
-      "question_patterns": {
-        "gyakori_kérdéstípusok": ["típus1", "típus2"],
-        "legmagasabb_értékelésű_kérdések": ["kérdés1", "kérdés2"],
-        "legalacsonyabb_értékelésű_kérdések": ["kérdés1", "kérdés2"],
-        "javaslatok": ["javaslat1", "javaslat2"]
-      },
-      "answer_quality": {
-        "átlagos_válasz_minőség": 4.5,
-        "gyakori_hibák": ["hiba1", "hiba2"],
-        "erősségek": ["erősség1", "erősség2"],
-        "javulási_területek": ["terület1", "terület2"],
-        "javaslatok": ["javaslat1", "javaslat2"]
-      }
-    }
-  }
-  ```
-- **Hibakezelés**:
-  ```json
-  {
-    "status": "error",
-    "message": "Hiba történt az elemzés során!"
-  }
-  ```
-
-## Fejlesztés
-
-A projekt további fejlesztési lehetőségei:
-- Több dokumentumformátum támogatása
-- Fejlettebb keresési algoritmusok
-- Felhasználói fiókok és jogosultságkezelés
-- Válaszok minőségének javítása
-- Teljesítmény optimalizálás
-- Több nyelvű támogatás
-- API dokumentáció készítése
-- Automatikus tanulás a visszajelzések alapján
-- Részletesebb elemzési funkciók
-- Adatbázis bevezetése a visszajelzések tárolására
-- Graf alapú dokumentum kapcsolatok kezelése
-- Válaszok minőségének automatikus javítása
-- Időbeli trendek és kérdési mintázatok elemzése
-- Dokumentumok gyorsítótárazása
+## Licenc
+Ez a projekt a [MIT Licenc](LICENSE) alatt érhető el.
