@@ -44,7 +44,7 @@ class LegalQASystem:
 
     def _initialize_qa_chain(self):
         """QA lánc inicializálása a dokumentumok betöltése után"""
-        llm = ChatOpenAI(temperature=0)
+        llm = ChatOpenAI(temperature=0, model="gpt-4.1-2025-04-14", api_key=os.getenv("OPENAI_API_KEY"))
 
         retriever = CustomRetriever(
             embeddings=self.embeddings,
